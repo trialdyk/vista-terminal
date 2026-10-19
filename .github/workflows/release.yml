@@ -1,0 +1,34 @@
+# Push a tag like v0.2.0 and this builds vista.exe for x64 and ARM64 and
+# attaches the zips to a GitHub release.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        target: [x86_64-pc-windows-msvc, aarch64-pc-windows-msvc]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "vista-${{ matrix.target }}"
+          New-Item -ItemType Directory $name | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/vista.exe", README.md, LICENSE $name
+          Compress-Archive "$name/*" "$name.zip"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: vista-${{ matrix.target }}.zip
+          generate_release_notes: true
